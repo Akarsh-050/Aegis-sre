@@ -1,2 +1,8 @@
 # Node dependencies
 node_modules/
+
+# Environment variables
+.env
+
+# test files
+tests/

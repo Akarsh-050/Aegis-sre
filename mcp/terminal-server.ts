@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { exec } from "child_process";
 import { promisify } from "util";
-
+import { readFile } from "fs/promises";
 
 const execAsync = promisify(exec);
 
@@ -34,6 +34,29 @@ server.tool(
     } catch (error: any) {
       return {
         content: [{ type: "text", text: `Error: ${error.message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+// 3. Define the "read_file" Tool
+server.tool(
+  "read_file",
+  "Reads the content of a specific file to analyze the code.",
+  {
+    path: z.string().describe("The relative path to the file (e.g., 'src/index.ts')"),
+  },
+  async ({ path }) => {
+    try {
+      console.error(`[Aegis] Reading file: ${path}`);
+      const content = await readFile(path, "utf-8");
+      return {
+        content: [{ type: "text", text: content }],
+      };
+    } catch (error: any) {
+      return {
+        content: [{ type: "text", text: `Error reading file: ${error.message}` }],
         isError: true,
       };
     }

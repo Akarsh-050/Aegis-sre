@@ -13,7 +13,7 @@ function startMonitoring(command: string , args: string[]){
 
     // Monitor stderr for crashes or critical errors
     child.stderr.on("data",(data)=>{
-        
+
         const errorMsg = data.toString().trim();
         console.log(`\x1b[31m[CRASH DETECTED]: ${errorMsg}\x1b[0m`);
         
