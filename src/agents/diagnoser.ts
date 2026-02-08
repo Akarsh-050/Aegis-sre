@@ -1,5 +1,7 @@
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { AgentState } from "../graph/state.js";
+import { getMCPTools } from "../mcp-client.js";
+
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -8,11 +10,13 @@ if (!apiKey) {
   throw new Error("GOOGLE_API_KEY is not set in environment variables");
 }
 
+const tools = await getMCPTools();
+
 // 1. Initialize Gemini
 const model = new ChatGoogleGenerativeAI({
-  model: "gemini-1.5-flash", 
+  model: "gemini-2.5-flash", 
   apiKey,
-});
+}).bindTools(tools);
 
 // 2. The Node Function
 export async function analyzerNode(state: typeof AgentState.State) {
@@ -29,8 +33,12 @@ export async function analyzerNode(state: typeof AgentState.State) {
     Return your response as JSON: { "filename": "path/to/file", "reason": "..." }
   `;
 
+ // console.log("Sending prompt to Gemini...");
+
   const response = await model.invoke(prompt);
   
+ // console.log("Gemini's Raw Response:", response);
+
   // We parse the AI response (in a real app, we'd use structured output)
   const result = JSON.parse(response.content as string);
 

@@ -3,7 +3,7 @@ import { AgentState } from "../graph/state.js";
 import { writeFile } from "fs/promises";
 
 const model = new ChatGoogleGenerativeAI({
-  model: "gemini-1.5-flash",
+  model: "gemini-2.5-flash",
   apiKey: process.env.GOOGLE_API_KEY!,
 });
 
@@ -24,7 +24,11 @@ export async function programmerNode(state: typeof AgentState.State) {
     Wrap your code in \`\`\`javascript or \`\`\`typescript blocks.
   `;
 
+
+
   const response = await model.invoke(prompt);
+
+
   const content = response.content as string;
 
   // 2. Extract the code from the Markdown (simple regex)

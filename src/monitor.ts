@@ -1,91 +1,85 @@
-import {spawn} from 'child_process';
-import { aegisBrain } from './graph/workflow.js';
-import *as readLine from 'node:readline/promises';
-import { stdin as input, stdout as output } from 'node:process';
+import { spawn } from "child_process";
+import { aegisBrain } from "./graph/workflow.js";
+import * as readLine from "node:readline/promises";
+import { stdin as input, stdout as output } from "node:process";
 
 async function askPermission(question: string): Promise<boolean> {
   const rl = readLine.createInterface({ input, output });
   const answer = await rl.question(`${question} (y/n): `);
   rl.close();
-  return answer.toLowerCase() === 'y';
+  return answer.trim().toLowerCase() === "y";
 }
 
+function generateThreadId() {
+  return `${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+}
 
-function startMonitoring(command: string , args: string[]){
-    console.log(`[Monitor] Starting target: ${command} ${args.join(" ")}`);
+async function handleCrash(errorMsg: string, thread_id: string) {
+  console.log("[Monitor] Alerting Aegis-SRE Brain...");
 
-    const child = spawn (command, args);
+  const config = { configurable: { thread_id } };
 
-    // Log stdout - Not critical, just for visibility (normal app logs)
-    child.stdout.on("data", (data)=>{
-        console.log(`[App Log] : ${data.toString().trim()}`);
-    });
+  // 🚀 First invocation — pass the error and start the graph
+  const result = await aegisBrain.invoke(
+    {
+      error: errorMsg,
+      attempts: 0,
+      isFixed: false,
+      targetFile: "",
+      fileContent: "",
+    },
+    config
+  );
 
-    // Monitor stderr for crashes or critical errors
-    child.stderr.on("data", async (data)=>{
+  // 🧠 Get the current state
+  const currentState = await aegisBrain.getState(config);
+  console.log("\n--- 🛡️ AEGIS-SRE DIAGNOSIS ---");
+  console.log(`Target File: ${currentState.values.targetFile}`);
+  console.log(`Detected Issue: ${currentState.values.error}`);
 
-        const errorMsg = data.toString().trim();
-        console.log(`\x1b[31m[CRASH DETECTED]: ${errorMsg}\x1b[0m`);
+  // ❓ Ask for permission
+  const approved = await askPermission("Do you want Aegis to apply the fix?");
+  if (!approved) {
+    console.log("🛑 Patch rejected by user. Ending monitoring for this crash.");
+    return;
+  }
 
-        
-        console.log("[Monitor] Alerting Aegis-SRE Brain...");  
+  console.log("🚀 Applying patch...");
 
-        // Trigger the Brain!
-        const finalState = await aegisBrain.invoke({
-            error: errorMsg,
-            attempts: 0,
-            isFixed: false,
-            targetFile: "",
-            fileContent: ""
-        });
+  // 🔁 Continuing from the last checkpoint
+  const resumeResult = await aegisBrain.invoke(null, config);
 
-        // need change the hardcoded thread_id
-        const config = { configurable: { thread_id: "1" } };
+  if (resumeResult.isFixed) {
+    console.log("✅ Code healed successfully.");
+  } else {
+    console.log("⚠️ Aegis attempted to fix, but the issue is still unresolved.");
+  }
+}
 
-        // Start the graph
-        let result = await aegisBrain.invoke({ 
-            error: errorMsg, 
-            attempts: 0, 
-            isFixed: false 
-        }, config);
+function startMonitoring(command: string, args: string[]) {
+  console.log(`[Monitor] Starting target: ${command} ${args.join(" ")}`);
 
-        // 2. The graph is now paused. Let's get the current state to show the user.
-        const currentState = await aegisBrain.getState(config);
-        console.log("\n--- 🛡️ AEGIS-SRE DIAGNOSIS ---");
-        console.log(`Target File: ${currentState.values.targetFile}`);
-        console.log(`Issue: ${currentState.values.error}`);
-        
-        // Ask for permission to apply the fix
-        const approved = await askPermission("Do you want Aegis to apply the fix?");
-        
+  const child = spawn(command, args);
 
+  child.stdout.on("data", (data) =>
+    console.log(`[App Log]: ${data.toString().trim()}`)
+  );
 
-        if (approved) {
-            console.log("🚀 Applying patch...");
-            // 4. Resume the graph by passing 'null'
-            const finalResult = await aegisBrain.invoke(null, config);
-            
-            if (finalResult.isFixed) {
-                console.log("✅ Code healed successfully.");
-            }
-            }
-        else {
-            console.log("🛑 Patch rejected by user. Standing down.");
-        }
+  child.stderr.on("data", async (data) => {
+    const errorMsg = data.toString().trim();
+    console.log(`\x1b[31m[CRASH DETECTED]: ${errorMsg}\x1b[0m`);
 
-        // if (finalResult.isFixed) {
-        // console.log("🏁 Aegis-SRE has successfully healed the app!");
-        // }
-     
-    });
+    const thread_id = generateThreadId();
+    await handleCrash(errorMsg, thread_id);
+  });
 
-    // Monitor for process exit with error codes
-    child.on("close",(code)=>{
-        if (code !== 0) {
-            console.log(`[Monitor] App exited with error code ${code}. Initiating healing...`);
-        }
-    });
-    
+  child.on("close", (code) => {
+    if (code !== 0) {
+      console.log(
+        `[Monitor] App exited with code ${code}. (No stderr triggered? Crash may be uncaught.)`
+      );
+    }
+  });
 }
 
 startMonitoring("node", ["./tests/broken.js"]);
