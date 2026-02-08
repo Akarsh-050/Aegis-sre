@@ -1,5 +1,5 @@
 import {spawn} from 'child_process';
-
+import { aegisBrain } from './graph/workflow.js';
 
 function startMonitoring(command: string , args: string[]){
     console.log(`[Monitor] Starting target: ${command} ${args.join(" ")}`);
@@ -12,13 +12,27 @@ function startMonitoring(command: string , args: string[]){
     });
 
     // Monitor stderr for crashes or critical errors
-    child.stderr.on("data",(data)=>{
+    child.stderr.on("data", async (data)=>{
 
         const errorMsg = data.toString().trim();
         console.log(`\x1b[31m[CRASH DETECTED]: ${errorMsg}\x1b[0m`);
+
         
-        // FUTURE STEP: This is where we will trigger Phase 3 (LangGraph)
-        console.log("[Monitor] Alerting Aegis-SRE Brain...");       
+        console.log("[Monitor] Alerting Aegis-SRE Brain...");  
+
+        // Trigger the Brain!
+        const finalState = await aegisBrain.invoke({
+            error: errorMsg,
+            attempts: 0,
+            isFixed: false,
+            targetFile: "",
+            fileContent: ""
+        });
+
+        if (finalState.isFixed) {
+        console.log("🏁 Aegis-SRE has successfully healed the app!");
+        }
+     
     });
 
     // Monitor for process exit with error codes
