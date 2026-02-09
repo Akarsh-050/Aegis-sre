@@ -16,44 +16,15 @@ function generateThreadId() {
 
 async function handleCrash(errorMsg: string, thread_id: string) {
   console.log("[Monitor] Alerting Aegis-SRE Brain...");
-
   const config = { configurable: { thread_id } };
-
   // 🚀 First invocation — pass the error and start the graph
-  const result = await aegisBrain.invoke(
-    {
-      error: errorMsg,
-      attempts: 0,
-      isFixed: false,
-      targetFile: "",
-      fileContent: "",
-    },
-    config
-  );
+  const result = await aegisBrain.invoke({},config);
 
   // 🧠 Get the current state
-  const currentState = await aegisBrain.getState(config);
-  console.log("\n--- 🛡️ AEGIS-SRE DIAGNOSIS ---");
-  console.log(`Target File: ${currentState.values.targetFile}`);
-  console.log(`Detected Issue: ${currentState.values.error}`);
 
   // ❓ Ask for permission
-  const approved = await askPermission("Do you want Aegis to apply the fix?");
-  if (!approved) {
-    console.log("🛑 Patch rejected by user. Ending monitoring for this crash.");
-    return;
-  }
-
-  console.log("🚀 Applying patch...");
 
   // 🔁 Continuing from the last checkpoint
-  const resumeResult = await aegisBrain.invoke(null, config);
-
-  if (resumeResult.isFixed) {
-    console.log("✅ Code healed successfully.");
-  } else {
-    console.log("⚠️ Aegis attempted to fix, but the issue is still unresolved.");
-  }
 }
 
 function startMonitoring(command: string, args: string[]) {
